@@ -38,7 +38,7 @@ class Attacker:
         n_fft       = int(16_000 * 0.02)
         hop_length  = int(16_000 * 0.01)
         win_length  = int(16_000 * 0.01)
-        self.torch_stft = STFT(n_fft=n_fft, 
+        self.stft = STFT(n_fft=n_fft, 
                                hop_length=hop_length, 
                                win_length=win_length,  
                                window='hamming', 
@@ -62,14 +62,14 @@ class Attacker:
     def attack(self):
         epsilon = 0.1
         alpha   = 1e-3
-        pgd_rounds = 500
+        pgd_rounds = 20
         
         data, target = self._sound.to(self.device), self._target.to(self.device)
         data_raw = data.clone().detach()
         
         criterion = nn.CTCLoss()
         
-        spec = torch_spectrogram(data, self.torch_stft)
+        spec = torch_spectrogram(data, self.stft)
         input_sizes = torch.IntTensor([spec.size(3)]).int()
         out, output_sizes, _ = self._model(spec, input_sizes)
         decoded_output, decoded_offsets = self._decoder.decode(out, output_sizes)
@@ -81,7 +81,7 @@ class Attacker:
         if attack_type == 'fgsm':
             data.requires_grad = True
             
-            spec = torch_spectrogram(data, self.torch_stft)
+            spec = torch_spectrogram(data, self.stft)
             input_sizes = torch.IntTensor([spec.size(3)]).int()
             out, output_sizes, _ = self._model(spec, input_sizes)
             out = out.transpose(0, 1)
@@ -104,7 +104,7 @@ class Attacker:
                 print(f'Performing round {round:4,d} / {pgd_rounds:4,d} of PGD')
                 data.requires_grad = True
             
-                spec = torch_spectrogram(data, self.torch_stft)
+                spec = torch_spectrogram(data, self.stft)
                 input_sizes = torch.IntTensor([spec.size(3)]).int()
                 out, output_sizes, _ = self._model(spec, input_sizes)
                 out = out.transpose(0, 1)
@@ -121,7 +121,7 @@ class Attacker:
             
             perturbed_data = data            
             
-        spec = torch_spectrogram(perturbed_data, self.torch_stft)
+        spec = torch_spectrogram(perturbed_data, self.stft)
         input_sizes = torch.IntTensor([spec.size(3)]).int()
         out, output_sizes, _ = self.model(spec, input_sizes)
         decoded_output, decoded_offsets = self.decoder.decode(out, output_sizes)
