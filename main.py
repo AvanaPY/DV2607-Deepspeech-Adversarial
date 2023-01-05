@@ -14,7 +14,7 @@ if __name__ == '__main__':
     parser.add_argument('--force-download-model', type=bool, default=False, 
                             dest='force_download_model', help='Whether or not to force a redownload of the model')
     parser.add_argument('--attack-method', choices=['pgd', 'fgsm'], default='fgsm', help='Which adversarial attack method to use')
-    parser.add_argument('--epsilon', type=float, default=0.1, help='Which value of epsilon to use for FGSM attack')
+    parser.add_argument('--epsilon', type=float, default=0.1, help='Which value of epsilon to use for PGD and FGSM attacks')
     parser.add_argument('--alpha', type=float, default=0.01, help='Which value of alpha to use for PGD attack')
     parser.add_argument('--pgd-steps', type=int, default=50, help='Number of PGD iterations', dest='pgd_steps')
     args = parser.parse_args()

@@ -144,7 +144,7 @@ class Attacker:
                 data_grad = data.grad.data
                 
                 adv_sound = data - alpha * data_grad.sign() # + -> - !!!
-                eta = torch.clamp(adv_sound - data_raw.data, min=-alpha, max=alpha)
+                eta = torch.clamp(adv_sound - data_raw.data, min=-epsilon, max=epsilon)
                 data = (data_raw + eta).detach_()
             
             perturbed_data = data     
