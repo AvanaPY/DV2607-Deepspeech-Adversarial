@@ -1,21 +1,53 @@
 import os
 import sys
 sys.path.append("deepspeech.pytorch/")
-from deepspeech_pytorch.utils import load_decoder, load_model
-from deepspeech_pytorch.configs.inference_config import TranscribeConfig
 import torchaudio
-from attacker import Attacker
-model_path = '/home/emkl/Documents/School/DV2607/ds2aa/models/librispeech/librispeech_pretrained_v3.ckpt'
-audio_path = '/home/emkl/Documents/School/DV2607/ds2aa/audio16k/osr34.wav'
+import time
+import argparse
+from model import Attacker
+from model import load_model_and_decoder
 
-target_sentence_str = 'I AM A BIG FAN OF COOKIES AND I WOULD LIKE IF YOU GAVE ME SOME ORANGES'
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--audio-file', type=str, required=True, dest='audio_file', help='Path to audio file')
+    parser.add_argument('--target-sentence', type=str, required=True, dest='target_sentence', help='Which target sentence to aim for')
+    parser.add_argument('--force-download-model', type=bool, default=False, 
+                            dest='force_download_model', help='Whether or not to force a redownload of the model')
+    parser.add_argument('--attack-method', choices=['pgd', 'fgsm'], default='fgsm', help='Which adversarial attack method to use')
+    parser.add_argument('--epsilon', type=float, default=0.1, help='Which value of epsilon to use for FGSM attack')
+    parser.add_argument('--alpha', type=float, default=0.01, help='Which value of alpha to use for PGD attack')
+    parser.add_argument('--pgd-steps', type=int, default=50, help='Number of PGD iterations', dest='pgd_steps')
+    args = parser.parse_args()
+    
+    DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+    model_path_rel      = 'models/librispeech/librispeech_pretrained_v3.ckpt'
+    model_download_url  = 'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3.0/librispeech_pretrained_v3.ckpt'
+    
+    model_path_abs = os.path.join(DIRECTORY, model_path_rel)
+    model, decoder = load_model_and_decoder(model_path_abs, model_download_url, args.force_download_model)
 
-cfg = TranscribeConfig
-model = load_model(device="cpu", model_path=model_path)
-decoder = load_decoder(labels=model.labels, cfg=cfg.lm)
+    audio_path = os.path.join(DIRECTORY, args.audio_file)
+    sound, sample_rate = torchaudio.load(audio_path)
+        
+    target_sentence_str = args.target_sentence.upper()
+    target_sentence = target_sentence_str.upper()
 
-sound, sample_rate = torchaudio.load(audio_path)
-target_sentence = target_sentence_str.upper()
-
-attacker = Attacker(model, decoder, sound, target_sentence)
-output = attacker.attack()
+    attacker = Attacker(model, 
+                        decoder, 
+                        sound, 
+                        target_sentence,
+                        attack_method=args.attack_method)
+    original, final, db_diff, l_distance = attacker.attack(
+        epsilon=args.epsilon,
+        alpha=args.alpha,
+        pgd_rounds=args.pgd_steps
+    )
+    
+    print(f'Original and final outputs:')
+    print(original)
+    print()
+    print(final)
+    print()
+    
+    print(f'dB difference: {db_diff}')
+    print(f'Levenshtein distance: {l_distance}')
