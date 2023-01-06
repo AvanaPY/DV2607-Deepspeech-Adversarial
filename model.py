@@ -7,7 +7,7 @@ import torchaudio
 from deepspeech_pytorch.utils import load_decoder, load_model
 from deepspeech_pytorch.configs.inference_config import TranscribeConfig
 
-from stft import STFT, magphase
+from stft import STFT
 from model_downloader import verify_model_exist
 
 SAMPLE_RATE = 16_000
@@ -19,8 +19,9 @@ def target_str_to_label(sentence, labels="_'ABCDEFGHIJKLMNOPQRSTUVWXYZ "):
     return torch.IntTensor(out)
 
 def torch_spectrogram(sound, stft):
-    real, imag = stft(sound)
-    mag, cos, sin = magphase(real, imag)
+    # real, imag = stft(sound)
+    # mag, cos, sin = magphase(real, imag)
+    mag, _ = stft(sound)
     mag = torch.log1p(mag)
     mean = mag.mean()
     std = mag.std()
@@ -59,24 +60,30 @@ class Attacker:
         self._model.to(self._device)
         self._model.train()              # Set the model into train mode so we can use backward() on the RNN
         self._decoder = decoder
+        self._loss = nn.CTCLoss()
         self._sound = sound
-        self._target_string = target_str
-        self._target = target_str_to_label(target_str)
-        self._target = self._target.view(1,-1)
-        self._target_lengths = torch.IntTensor([self._target.shape[1]]).view(1,-1)
         self._save_path = save_path
+        
+        if self._attack_method != 'untargeted':
+            assert not (target_str is None), "You must have a target string for targeted attacks"
+            self._target_string = target_str
+            self._target = target_str_to_label(target_str)
+            self._target = self._target.view(1,-1)
+            self._target_lengths = torch.IntTensor([self._target.shape[1]]).view(1,-1)
+        else:
+            self._target_string = None
+            self._target = None
+            self._target_lengths = None
         
         n_fft       = int(SAMPLE_RATE * 0.02)
         hop_length  = int(SAMPLE_RATE * 0.01)
         win_length  = int(SAMPLE_RATE * 0.01)
-        self.stft = STFT(n_fft=n_fft, 
-                               hop_length=hop_length, 
-                               win_length=win_length,  
-                               window='hamming', 
-                               center=True, 
-                               pad_mode='reflect', 
-                               freeze_parameters=True, 
-                               device=self.device)
+        self.stft = STFT(   n_fft=n_fft, 
+                            hop_length=hop_length, 
+                            win_length=win_length,  
+                            window='hann',
+                            device=self._device)
+        
         
     @property
     def device(self):
@@ -92,63 +99,37 @@ class Attacker:
     
     def attack(self, epsilon : float = 0.1, alpha : float = 1e-2, pgd_rounds : int = 50):
         
-        data, target = self._sound.to(self.device), self._target.to(self.device)
+        data = self._sound.to(self.device)
         data_raw = data.clone().detach()
-        
-        criterion = nn.CTCLoss()
         
         spec = torch_spectrogram(data, self.stft)
         input_sizes = torch.IntTensor([spec.size(3)]).int()
         out, output_sizes, _ = self._model(spec, input_sizes)
         decoded_output, decoded_offsets = self._decoder.decode(out, output_sizes)
         original_output = decoded_output[0][0]
+       
+        target = self._target
+        if target is None:
+            target_str = original_output
+            target = target_str_to_label(target_str).view(1,-1)
+            target_lengths = torch.IntTensor([target.shape[1]]).view(1,-1)
+        else:
+            target_str = self._target_string
+            target = target.to(self.device)
+            target_lengths = self._target_lengths
         
-        # Let us perform fgsm fuck you
-        attack_type = self._attack_method
-        if attack_type == 'fgsm':
-            data.requires_grad = True
+        initial_levenshtein = Levenshtein.distance(original_output, target_str)
+        print(f'Initial Levenshtein: {initial_levenshtein}')
+        
+        # Let us perform some attack
+        if self._attack_method == 'fgsm':
+            perturbed_data = self.fgsm_attack(epsilon, data, target, target_lengths)
             
-            spec = torch_spectrogram(data, self.stft)
-            input_sizes = torch.IntTensor([spec.size(3)]).int()
-            out, output_sizes, _ = self._model(spec, input_sizes)
-            out = out.transpose(0, 1)
-            out = out.log_softmax(2)
-            loss = criterion(out, target, output_sizes, self._target_lengths)
-            
-            self._model.zero_grad()
-            loss.backward()
-            data_grad = data.grad.data
-            
-            # find direction of gradient
-            sign_data_grad = data_grad.sign()
-            
-            # add noise "epilon * direction" to the original sound
-            perturbed_data = data - epsilon * sign_data_grad
-            
-        elif attack_type == 'pgd':
-            data.requires_grad = True
-            for round in range(pgd_rounds):
-                done = int(50 * round / pgd_rounds)
-                print(f'\rPGD [{"="*done}{" "*(50-done)}] {round:5,d} /{pgd_rounds:5,d}', end='')
-                data.requires_grad = True
-            
-                spec = torch_spectrogram(data, self.stft)
-                input_sizes = torch.IntTensor([spec.size(3)]).int()
-                out, output_sizes, _ = self._model(spec, input_sizes)
-                out = out.transpose(0, 1)
-                out = out.log_softmax(2)
-                loss = criterion(out, target, output_sizes, self._target_lengths)
-                
-                self._model.zero_grad()
-                loss.backward()
-                data_grad = data.grad.data
-                
-                adv_sound = data - alpha * data_grad.sign() # + -> - !!!
-                eta = torch.clamp(adv_sound - data_raw.data, min=-epsilon, max=epsilon)
-                data = (data_raw + eta).detach_()
-            
-            perturbed_data = data     
-            print()       
+        elif self._attack_method == 'pgd':
+            perturbed_data = self.pgd_attack(epsilon, alpha, pgd_rounds, data, data_raw, target, target_lengths)     
+
+        elif self._attack_method == 'untargeted':  
+            perturbed_data = self.untargeted_attack(epsilon, alpha, pgd_rounds, data, data_raw, target, target_lengths)     
             
         spec = torch_spectrogram(perturbed_data, self.stft)
         input_sizes = torch.IntTensor([spec.size(3)]).int()
@@ -156,12 +137,85 @@ class Attacker:
         decoded_output, decoded_offsets = self.decoder.decode(out, output_sizes)
         final_output = decoded_output[0][0]
         
-        abs_ori = np.log10(np.max(np.absolute(data_raw.cpu().detach().numpy())))
-        abs_after = np.log10(np.max(np.absolute(perturbed_data.cpu().detach().numpy())))
-        db_difference = 20 * (abs_after-abs_ori)
-        l_distance = Levenshtein.distance(self._target_string, final_output)
+        db_ori  = 20 * np.max(np.log10(np.absolute(data_raw.cpu().detach().numpy())))
+        db_aft  = 20 * np.max(np.log10(np.absolute(perturbed_data.cpu().detach().numpy())))
+        db_difference = db_aft - db_ori
+        l_distance = Levenshtein.distance(target_str, final_output)
         
         if self._save_path:
             torchaudio.save(self._save_path, src=perturbed_data.cpu(), sample_rate=SAMPLE_RATE)
         
         return original_output, final_output, db_difference, l_distance
+
+    # This implements a version of an untargeted white box attack
+    # which is based on the same algorithm of PGD, however instead of minimisng
+    # the loss to a target sentence, it tries to maximise the loss against
+    # the original data.
+    def untargeted_attack(self, epsilon, alpha, pgd_rounds, data, data_raw, target, target_lengths):
+        for round in range(pgd_rounds):
+            done = int(50 * round / pgd_rounds)
+            print(f'\rUntargeted [{"="*done}{" "*(50-done)}] {round:6,d} / {pgd_rounds:6,d}', end='')
+            data.requires_grad = True
+            
+            spec = torch_spectrogram(data, self.stft)
+            input_sizes = torch.IntTensor([spec.size(3)]).int()
+            out, output_sizes, _ = self._model(spec, input_sizes)
+            out = out.transpose(0, 1).log_softmax(2)
+            loss = self._loss(out, target, output_sizes, target_lengths)
+                
+            self._model.zero_grad()
+            loss.backward()
+            data_grad = data.grad.data
+                
+            adversarial_sound = data + alpha * data_grad.sign() # + -> - !!!
+            perturbation = torch.clamp(adversarial_sound - data_raw.data, min=-epsilon, max=epsilon)
+            data = (data_raw + perturbation).detach_()
+        print() 
+        perturbed_data = data
+        return perturbed_data
+
+    # This implements a basic Projected Gradient Descent attack
+    def pgd_attack(self, epsilon, alpha, pgd_rounds, data, data_raw, target, target_lengths):
+        for round in range(pgd_rounds):
+            done = int(50 * round / pgd_rounds)
+            print(f'\rPGD [{"="*done}{" "*(50-done)}] {round:6,d} / {pgd_rounds:6,d}', end='')
+            data.requires_grad = True
+            
+            spec = torch_spectrogram(data, self.stft)
+            input_sizes = torch.IntTensor([spec.size(3)]).int()
+            out, output_sizes, _ = self._model(spec, input_sizes)
+            out = out.transpose(0, 1).log_softmax(2)
+            loss = self._loss(out, target, output_sizes, target_lengths)
+
+            self._model.zero_grad()
+            loss.backward()
+            data_grad = data.grad.data
+                
+            adversarial_sound = data - alpha * data_grad.sign() # + -> - !!!
+            perturbation = torch.clamp(adversarial_sound - data_raw.data, min=-epsilon, max=epsilon)
+            data = (data_raw + perturbation).detach_()
+        print()
+            
+        perturbed_data = data     
+        return perturbed_data
+
+    # This implements a basic FGSM attack
+    def fgsm_attack(self, epsilon, data, target, target_lengths):
+        data.requires_grad = True
+            
+        spec = torch_spectrogram(data, self.stft)
+        input_sizes = torch.IntTensor([spec.size(3)]).int()
+        out, output_sizes, _ = self._model(spec, input_sizes)
+        out = out.transpose(0, 1).log_softmax(2)
+        loss = self._loss(out, target, output_sizes, target_lengths)
+            
+        self._model.zero_grad()
+        loss.backward()
+        data_grad = data.grad.data
+            
+        # find direction of gradient
+        sign_data_grad = data_grad.sign()
+            
+        # add noise "epilon * direction" to the original sound
+        perturbed_data = data - epsilon * sign_data_grad
+        return perturbed_data
