@@ -1,3 +1,9 @@
+"""
+    DV2607 - Project
+    Written by
+        Emil Karlström
+        Samuel Jonsson
+"""
 from typing import *
 import os 
 import urllib.request
@@ -8,8 +14,8 @@ def verify_model_exist(model_path : str, model_url : Optional[str] = None, force
     if force_download or not os.path.exists(model_path):
         download_model(model_path, model_url)
     else:
-        print(f'Found model at {model_path}')  
-    
+        #print(f'Found model at {model_path}')  
+        pass
 def download_model(model_path : str, model_url : str):
     if model_url is None:
         raise ValueError('`model_url` cannot be None')

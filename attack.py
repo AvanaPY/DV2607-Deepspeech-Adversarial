@@ -1,11 +1,18 @@
+"""
+    DV2607 - Project
+    Written by
+        Emil Karlström
+        Samuel Jonsson
+"""
 import os
 import sys
 sys.path.append("deepspeech.pytorch/")
 import torchaudio
 import time
 import argparse
-from model import Attacker
-from model import load_model_and_decoder
+
+from model.model import Attacker
+from model.model import load_model_and_decoder
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -14,13 +21,14 @@ if __name__ == '__main__':
     parser.add_argument('--attack-method', choices=['pgd', 'fgsm', 'untargeted'], default='fgsm', help='Which adversarial attack method to use')
     parser.add_argument('--epsilon', type=float, default=0.1, help='Which value of epsilon to use for PGD and FGSM attacks')
     parser.add_argument('--alpha', type=float, default=0.01, help='Which value of alpha to use for PGD attack')
-    parser.add_argument('--pgd-steps', type=int, default=50, help='Number of PGD iterations', dest='pgd_steps')
+    parser.add_argument('--steps', type=int, default=50, help='Number of PGD iterations', dest='pgd_steps')
     parser.add_argument('--force-download-model', type=bool, default=False, 
                             dest='force_download_model', help='Whether or not to force a redownload of the model')
     args = parser.parse_args()
     
     DIRECTORY = os.path.dirname(os.path.abspath(__file__))
     model_path_rel      = 'models/librispeech/librispeech_pretrained_v3.ckpt'
+    # https://github.com/SeanNaren/deepspeech.pytorch/releases
     model_download_url  = 'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3.0/librispeech_pretrained_v3.ckpt'
     
     model_path_abs = os.path.join(DIRECTORY, model_path_rel)
@@ -51,5 +59,9 @@ if __name__ == '__main__':
     print(final)
     print()
     
-    print(f'dB difference: {db_diff}')
     print(f'Levenshtein distance: {l_distance}')
+    print(f'New sentence length:  {len(final)}')
+    print(f'Org sentence length:  {len(original)}')
+    print(f'Max l-distance:       {max(len(final), len(original))}')
+    if (args.attack_method != 'untargeted'):
+        print(f'Targeted sentence: {target_str.upper()}')

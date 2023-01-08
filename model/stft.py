@@ -1,8 +1,16 @@
 """
-    The STFT algorithm is acquired from 
+    DV2607 - Project
+    Written by
+        Emil Karlström
+        Samuel Jonsson
+        
+        
+        
+    This torch implemented STFT algorithm is acquired from 
         git@github.com:pseeth/torch-stft.git
         https://github.com/pseeth/torch-stft
     and slightly modified to work with CUDA
+    
 """
 import torch
 import numpy as np
