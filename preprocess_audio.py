@@ -4,8 +4,8 @@ import argparse
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_file', type=str, help='Original wav file', dest='input_file')
-    parser.add_argument('--output_file', type=str, help='Output wav file', dest='output_file')
+    parser.add_argument('--input-file', type=str, help='Original wav file', dest='input_file')
+    parser.add_argument('--output-file', type=str, help='Output wav file', dest='output_file')
     args = parser.parse_args()
 
     wav_file = args.input_file
