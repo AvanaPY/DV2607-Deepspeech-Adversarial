@@ -22,6 +22,7 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', type=float, default=0.1, help='Which value of epsilon to use for PGD and FGSM attacks')
     parser.add_argument('--alpha', type=float, default=0.01, help='Which value of alpha to use for PGD attack')
     parser.add_argument('--steps', type=int, default=200, help='Number of PGD iterations', dest='pgd_steps')
+    parser.add_argument('--device', type=str, choices=['cpu', 'cuda'], default='cuda', help="Which device to run on")
     parser.add_argument('--force-download-model', type=bool, default=False, 
                             dest='force_download_model', help='Whether or not to force a redownload of the model')
     args = parser.parse_args()
@@ -45,7 +46,8 @@ if __name__ == '__main__':
                         decoder=decoder, 
                         sound=sound, 
                         target_str=target_str,
-                        attack_method=args.attack_method)
+                        attack_method=args.attack_method,
+                        device=args.device)
     original, final, db_diff, l_distance = attacker.attack(
         epsilon=args.epsilon,
         alpha=args.alpha,

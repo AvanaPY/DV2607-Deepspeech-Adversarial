@@ -59,8 +59,9 @@ class Attacker:
                  sound, 
                  target_str, 
                  attack_method : str = 'fgsm',
-                 save_path : str = 'save.wav'):
-        self._device = 'cuda'
+                 save_path : str = 'save.wav',
+                 device : str = 'cuda'):
+        self._device = device
         self._attack_method = attack_method
         self._model = model
         self._model.to(self._device)

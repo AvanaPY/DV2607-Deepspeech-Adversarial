@@ -9,6 +9,14 @@ This runs on `Python 3.7.12` as the code acquired from [deepspeech.pytorch](`htt
 
 In order to install all dependencies, make sure that you are running the correct version of python, that being `3.7.12`.
 
+After cloning this repository, initialise the git submodules by running
+
+`git submodules init`
+
+and download the `deepspeech.pytorch` submodule by running
+
+`git submodule update`.
+
 Then install all of the dependencies for Sean Naren's DeepSpeech implementation by running
 
 `pip install -r deepspeech.pytorch/requirements.txt`
@@ -22,7 +30,8 @@ in order to download all of the dependencies required. It is very important that
 # Documentation
 
 ## File attack.py
-Performs an adversarial attack on an audio file.
+Performs an adversarial attack on an audio file. 
+This will auto-download the DeepSpeech model if it is not downloaded yet. 
 
 * --audio-file
 > Path to the audio file to perform the attack on. Must be sampled at 16kHz. This is required.
@@ -36,6 +45,8 @@ Performs an adversarial attack on an audio file.
 > The value of alpha to use for the PGD and untargeted attacks. Corresponds to the step size. Defaults to 0.01
 * --steps
 > How many iterations to take during the PGD and untargeted attacks. Defaults to 200
+* --device
+> Which device to run on, either `cuda` or `cpu`. Defaults to `cuda` because this runs really REALLY slow on cpu.
 * --force-download-model
 > Whether to force a download of the DeepSpeech model if the program cannot find it. The relative path to the model must be `models/librispeech/librispeech_pretrained_v3.ckpt`. Defaults to False
 
