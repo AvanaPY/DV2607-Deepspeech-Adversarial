@@ -9,21 +9,19 @@ This runs on `Python 3.7.12` as the code acquired from [deepspeech.pytorch](`htt
 
 In order to install all dependencies, make sure that you are running the correct version of python, that being `3.7.12`.
 
-After cloning this repository, initialise the git submodules by running
+After cloning this repository, initialise the deepspeech.pytorch submodule and download it 
 
-`git submodules init`
-
-and download the `deepspeech.pytorch` submodule by running
-
-`git submodule update`.
+```
+git submodules init
+git submodule update
+```
 
 Then install all of the dependencies for Sean Naren's DeepSpeech implementation by running
 
-`pip install -r deepspeech.pytorch/requirements.txt`
-
-then run 
-
-`pip install -r requirements.txt` 
+```
+pip install -r deepspeech.pytorch/requirements.txt
+pip install -r requirements.txt
+```
 
 in order to download all of the dependencies required. It is very important that you run these two in this order to avoid any potential conflicts.
 
