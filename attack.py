@@ -28,7 +28,6 @@ if __name__ == '__main__':
     
     DIRECTORY = os.path.dirname(os.path.abspath(__file__))
     model_path_rel      = 'models/librispeech/librispeech_pretrained_v3.ckpt'
-    # https://github.com/SeanNaren/deepspeech.pytorch/releases
     model_download_url  = 'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3.0/librispeech_pretrained_v3.ckpt'
     
     model_path_abs = os.path.join(DIRECTORY, model_path_rel)

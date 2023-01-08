@@ -5,6 +5,20 @@ Attack on Speech-To-Text
 
 This runs on `Python 3.7.12` as the code acquired from [deepspeech.pytorch](`https://github.com/SeanNaren/deepspeech.pytorch`) has some dependencies that only work before `Python 3.8`.
 
+# Installation
+
+In order to install all dependencies, make sure that you are running the correct version of python, that being `3.7.12`.
+
+Then install all of the dependencies for Sean Naren's DeepSpeech implementation by running
+
+`pip install -r deepspeech.pytorch/requirements.txt`
+
+then run 
+
+`pip install -r requirements.txt` 
+
+in order to download all of the dependencies required. It is very important that you run these two in this order to avoid any potential conflicts.
+
 # Documentation
 
 ## File attack.py

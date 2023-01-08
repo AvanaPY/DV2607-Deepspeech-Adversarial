@@ -16,6 +16,7 @@ def verify_model_exist(model_path : str, model_url : Optional[str] = None, force
     else:
         #print(f'Found model at {model_path}')  
         pass
+    
 def download_model(model_path : str, model_url : str):
     if model_url is None:
         raise ValueError('`model_url` cannot be None')
@@ -24,6 +25,7 @@ def download_model(model_path : str, model_url : str):
     
     print(f'Downloading model to {dirname}')
     start_time = time.time()
+    os.makedirs(dirname, exist_ok=True)
     with open(model_path, 'wb') as f:
         response = requests.get(model_url, stream=True)
         total_length = response.headers.get('content-length')
